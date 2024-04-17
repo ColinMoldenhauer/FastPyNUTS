@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "FastPyNUTS"
+authors = [
+  { name="Colin Moldenhauer", email="colin.moldenhauer@tum.de" },
+  { name="Michael Engel", email="m.engel@tum.de" },
+]
+description = "A fast implementation of querying for NUTS regions by location."
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+dependencies = ["geojson"]
+dynamic = ["version", "readme"]
+
+[tool.setuptools]
+packages = ["fastpynuts"]
+
+[tool.setuptools.dynamic]
+readme = {file = "README.md", content-type = "text/markdown"}
+
+[project.urls]
+Homepage = "https://github.com/ColinMoldenhauer/FastPyNUTS"
+Issues = "https://github.com/ColinMoldenhauer/FastPyNUTS/issues"
