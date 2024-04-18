@@ -1,1 +1,3 @@
 geojson
+shapely
+rtree
