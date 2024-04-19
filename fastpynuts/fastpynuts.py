@@ -143,7 +143,7 @@ class NUTSfinder:
 
 
     # Finding
-    def _find_poly(self, regions, lon, lat):
+    def _find_poly(self, lon, lat, regions):
         """Naive sequential implementation, testing every region."""
         hits = []
         for region in regions:
@@ -151,7 +151,7 @@ class NUTSfinder:
                 hits.append(region)
         return hits
 
-    def _find_bbox(self, regions, lon, lat):
+    def _find_bbox(self, lon, lat, regions):
         """Bbox test."""
         hits = []
         for region in regions:
@@ -166,13 +166,13 @@ class NUTSfinder:
                 hits.append(region)
         return hits
 
-    def _find_rtree(self, regions, lon, lat):
+    def _find_rtree(self, lon, lat, *args):
         """Find point fast using a R-tree."""
         eps = 0
         hits = list(self.rtree.intersection((lon-eps, lat-eps, lon+eps, lat+eps), objects="raw"))
 
         if len(hits) > self.max_level+1:
-            hits = self._find_poly(hits, lon, lat)
+            hits = self._find_poly(lon, lat, hits)
 
             if len(hits) > self.max_level-self.min_level+1:
                 print("more hits than expected -> investigate")
@@ -204,7 +204,7 @@ class NUTSfinder:
     def find(self, lon, lat, method="rtree", verbose=False):
         find_ = getattr(self, f"_find_{method}")
         t0 = time.time()
-        results = find_(self, lon, lat)
+        results = find_(lon, lat, self.regions)
         t1 = time.time()
         if verbose: print(f"find_{method} took {t1-t0} s")
         return sorted(results)
