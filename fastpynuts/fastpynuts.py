@@ -5,6 +5,8 @@ import geojson
 
 from shapely.geometry import Point, Polygon
 from rtree import index
+from treelib import Tree
+from treelib.exceptions import NodeIDAbsentError
 
 from .utils import geometry2polygon
 
@@ -58,6 +60,7 @@ class NUTSfinder:
         self.regions = self._load_regions(level, min_level, max_level)                 # store initial regions for dynamic filtering (avoid reloading large input files for new filters)
 
         self.rtree = self._construct_r_tree()
+        self.tree = self._construct_tree()
 
     def __getitem__(self, idx): return self.regions[idx]
 
@@ -97,12 +100,44 @@ class NUTSfinder:
         return regions_filtered
 
 
-    # R-tree
+    # constructing trees
     def _construct_r_tree(self):
         idx = index.Index()
         for i, region in enumerate(self.regions):
             idx.insert(id=i, coordinates=region.bbox, obj=region)
         return idx
+
+
+    def _construct_tree(self):
+        regions = sorted(self.regions)
+
+        # initially construct tree
+        tree = Tree()
+        tree.create_node(tag="NUTS", identifier="root")
+        for i, region in enumerate(sorted(regions)):
+            if region.level == 0:
+                tree.create_node(tag=str(region), identifier=region.id, parent="root", data=region)
+            else:
+                parent = region.id[:-1]
+                try:
+                    tree.create_node(tag=str(region), identifier=region.id, parent=parent, data=region)
+                except NodeIDAbsentError:
+                    print(f"Node {region.id} with non-present parent {parent}.")
+
+
+        # construct R-tree for each node and insert into regular tree
+        for node_id in tree.expand_tree():
+            node = tree.get_node(node_id)
+            children = tree.children(node_id)
+
+            rtree = index.Index()
+            for i, child in enumerate(children):
+                region = child.data
+                rtree.insert(id=i, coordinates=region.bbox, obj=region)
+
+            node.data = rtree
+
+        return tree
 
 
     # Finding
@@ -146,6 +181,23 @@ class NUTSfinder:
                 pdb.set_trace()
 
         return hits
+
+    def _find_tree(self, lon, lat, *args):
+        eps = 0
+        out = []
+        current_node = "root"
+        while self.tree.children(current_node):
+            hits = list(self.tree[current_node].data.intersection((lon-eps, lat-eps, lon+eps, lat+eps), objects="raw"))
+            if len(hits) > 1:
+                hits = self._find_poly(lon, lat, hits)
+
+            out.extend(hits)
+            if hits:
+                current_node = hits[0].id
+            else:
+                break
+        return out
+
 
     def find(self, lon, lat, method="rtree", verbose=False):
         find_ = getattr(self, f"_find_{method}")
