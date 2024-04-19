@@ -32,7 +32,9 @@ class NUTSregion():
 
     def __eq__(self, other): return self.id == other.id
 
-    def __lt__(self, other): return self.level < other.level and self.id < other.id
+    def __lt__(self, other): return (self.level < other.level) or (self.level == other.level and self.id < other.id)
+
+
     @property
     def id(self): return self.properties["NUTS_ID"]
 
