@@ -143,8 +143,9 @@ class NUTSfinder:
     def _find_poly(self, lon, lat, regions):
         """Naive sequential implementation, testing every region."""
         hits = []
+        p = Point((lon, lat))
         for region in regions:
-            if region.geom.intersects(Point((lon, lat))):
+            if region.geom.contains(p):
                 hits.append(region)
         return hits
 
