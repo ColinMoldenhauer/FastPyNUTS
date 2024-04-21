@@ -164,17 +164,7 @@ class NUTSfinder:
         """Find point fast using a R-tree."""
         eps = 0
         hits = list(self.rtree.intersection((lon-eps, lat-eps, lon+eps, lat+eps), objects="raw"))
-
-        if len(hits) > self.max_level+1:
-            hits = self._find_poly(lon, lat, hits)
-
-            if len(hits) > self.max_level-self.min_level+1:
-                print("more hits than expected -> investigate")
-                print(f"\tmax level {self.max_level}")
-                print("\tlen hits", len(hits))
-                print("\tlen hits poly", len(hits))
-                import pdb
-                pdb.set_trace()
+        hits = self._find_poly(lon, lat, hits)
 
         return hits
 
@@ -184,9 +174,7 @@ class NUTSfinder:
         current_node = "root"
         while self.tree.children(current_node):
             hits = list(self.tree[current_node].data.intersection((lon-eps, lat-eps, lon+eps, lat+eps), objects="raw"))
-            if len(hits) > 1:
-                hits = self._find_poly(lon, lat, hits)
-
+            hits = self._find_poly(lon, lat, hits)
             out.extend(hits)
             if hits:
                 current_node = hits[0].id
