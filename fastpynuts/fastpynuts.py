@@ -156,13 +156,7 @@ class NUTSfinder:
         hits = []
         for region in regions:
             xmin, ymin, xmax, ymax = region.bbox
-            p1 = (xmin, ymin)
-            p2 = (xmin, ymax)
-            p3 = (xmax, ymax)
-            p4 = (xmax, ymin)
-            rect = Polygon([p1, p2, p3, p4, p1])
-
-            if rect.intersects(Point((lon, lat))):
+            if (xmin <= lon <= xmax) and (ymin <= lat <= ymax):
                 hits.append(region)
         return hits
 
