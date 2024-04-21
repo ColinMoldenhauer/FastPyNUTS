@@ -57,8 +57,7 @@ class NUTSfinder:
     def __init__(self, geojsonfile, level=None, min_level=0, max_level=3):
         self.file = geojsonfile
 
-        self.year, self.scale, self.crs = self._parse_filename(geojsonfile)
-        self.years = [self.year]
+        self.scale, self.year, self.crs = self._parse_filename(geojsonfile)
         self.regions = self._load_regions(level, min_level, max_level)                 # store initial regions for dynamic filtering (avoid reloading large input files for new filters)
 
         self.rtree = self._construct_r_tree()
@@ -71,9 +70,8 @@ class NUTSfinder:
 
     # Utilities
     def _parse_filename(self, file):
-        scale1, scale2, year, crs = re.search("NUTS_RG_([1-9]\d)|0(\d)M_(\d+)_(\d+)", file).groups()
-        scale = scale1 or scale2
-        return scale, year, crs
+        scale, year, crs = re.search("NUTS_RG_(\d{,2})M_(\d+)_(\d+)", file).groups()
+        return int(scale), int(year), int(crs)
 
     def _set_level(self, level=None, min_level=0, max_level=3):
         if level:
@@ -108,7 +106,6 @@ class NUTSfinder:
         for i, region in enumerate(self.regions):
             idx.insert(id=i, coordinates=region.bbox, obj=region)
         return idx
-
 
     def _construct_tree(self):
         regions = sorted(self.regions)
