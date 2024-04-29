@@ -73,6 +73,37 @@ class NUTSfinder:
     def __len__(self): return len(self.regions)
 
 
+    def find(self, lon, lat, method="tree", valid_point=False, verbose=False, **kwargs):
+        """
+        Find a point's NUTS regions by longitude and latitude.
+        For large-scale applications, if it is known, that the point corresponds to a valid location within the NUTS regions, use `valid_point = True` for a speedup.
+
+
+        Multiple methods are available:
+
+        **tree**:
+        Exploits the hierarchical structure of the NUTS regions. First checks the coordinates against the NUTS level 0 regions. Then, the children regions of
+        level 1 are checked, etc. At each level, region candidates are determined by a fast R-tree test, followed by a point-in-polygon check of the candidates.
+
+        **rtree**:
+        A single R-tree is constructed for all regions, independent of level. Region candidates are then determined by the R-tree's `intersect()` method,
+        followed by a point-in-polygon check of the candidates.
+
+        **bbox**:
+        Sequentially performs a point-in-bbox test of all regions, followed by a point-in-polygon check of the candidates.
+
+        **poly**:
+        Sequentially performs a point-in-polygon test of all regions.
+
+        """
+        find_ = getattr(self, f"_find_{method}")
+        t0 = time.time()
+        results = find_(lon, lat, self.regions, valid_point=valid_point, **kwargs)
+        t1 = time.time()
+        if verbose: print(f"find_{method} took {t1-t0} s")
+        return sorted(results)
+
+
     # Utilities
     def _parse_filename(self, file):
         scale, year, crs = re.search("NUTS_RG_(\d{,2})M_(\d+)_(\d+)", file).groups()
@@ -88,9 +119,9 @@ class NUTSfinder:
 
     def _filter_regions(self, regions):
         filtered = []
-        for shape in regions["features"]:
-            if self.min_level <= shape["properties"]["LEVL_CODE"] <= self.max_level:
-                filtered.append(shape)
+        for feature in regions["features"]:
+            if self.min_level <= feature["properties"]["LEVL_CODE"] <= self.max_level:
+                filtered.append(feature)
 
         regions = [NUTSregion(feature) for feature in filtered]
         return regions
@@ -197,7 +228,7 @@ class NUTSfinder:
 
 
     # Finding utilities
-    def _maybe_validate(self, lon, lat, hits, valid_point, expected_hits=None):
+    def _maybe_validate(self, lon, lat, hits, valid_point, expected_hits=None, verbose=False):
         """
         A-priori knowledge about the validity of query points can be used to maximize the querying speed.
 
@@ -206,6 +237,7 @@ class NUTSfinder:
         """
         # TODO: only do polygon test for level3/(for non-unique levels @valid_point)?
         expected_hits = expected_hits or self.max_level-self.min_level+1
+        if verbose: print("_maybe_validate:", hits)
 
         if valid_point and len(hits) > expected_hits:
             # TODO: smarter
@@ -224,7 +256,18 @@ class NUTSfinder:
         return parents
 
 
-    def _get_full_NUTS_set(self, hits, expected_hits=None):
+    def _get_full_NUTS_set(self, hits):
+        """Assumption: each point either has 4 regions, or 0."""
+
+        level3s = [hit for hit in hits if hit.level == self.max_level]
+        for region in level3s:
+            parents = self._get_parents(self.tree, region.id)
+            if all([p in hits for p in parents]):
+                return [*parents, region]
+        return []
+
+
+    def _get_full_NUTS_set_old(self, hits, expected_hits=None):
         """Assumption: each point either has 4 regions, or 0."""
         expected_hits = expected_hits or self.max_level-self.min_level+1
 
@@ -259,15 +302,20 @@ class NUTSfinder:
             xmin, ymin, xmax, ymax = region.bbox
             if (xmin <= lon <= xmax) and (ymin <= lat <= ymax):
                 hits.append(region)
+        hits = self._get_full_NUTS_set(hits)
         hits = self._maybe_validate(lon, lat, hits, valid_point)
 
         return hits
 
 
+    def _candidates_rtree(self, lon, lat, regions):
+        hits = [regions[i] for i in self.rtree.intersection((lon, lat, lon, lat))]
+        return hits
+
+
     def _find_rtree(self, lon, lat, *args, valid_point=False):
         """Find point fast using a R-tree."""
-        eps = 0
-        hits = [self.regions[i] for i in self.rtree.intersection((lon-eps, lat-eps, lon+eps, lat+eps))]
+        hits = self._candidates_rtree(lon, lat, self.regions)
         hits = self._get_full_NUTS_set(hits)
         hits = self._maybe_validate(lon, lat, hits, valid_point)
 
@@ -335,37 +383,6 @@ class NUTSfinder:
                 # if valid_point: raise ValueError(f"Could not locate point ({lon}, {lat}) despite `valid_point`=True.")
                 break
         return out
-
-
-    def find(self, lon, lat, method="tree", valid_point=False, verbose=False):
-        """
-        Find a point's NUTS regions by longitude and latitude.
-        For large-scale applications, if it is known, that the point corresponds to a valid location within the NUTS regions, use `valid_point = True` for a speedup.
-
-
-        Multiple methods are available:
-
-        **tree**:
-        Exploits the hierarchical structure of the NUTS regions. First checks the coordinates against the NUTS level 0 regions. Then, the children regions of
-        level 1 are checked, etc. At each level, region candidates are determined by a fast R-tree test, followed by a point-in-polygon check of the candidates.
-
-        **rtree**:
-        A single R-tree is constructed for all regions, independent of level. Region candidates are then determined by the R-tree's `intersect()` method,
-        followed by a point-in-polygon check of the candidates.
-
-        **bbox**:
-        Sequentially performs a point-in-bbox test of all regions, followed by a point-in-polygon check of the candidates.
-
-        **poly**:
-        Sequentially performs a point-in-polygon test of all regions.
-
-        """
-        find_ = getattr(self, f"_find_{method}")
-        t0 = time.time()
-        results = find_(lon, lat, self.regions, valid_point=valid_point)
-        t1 = time.time()
-        if verbose: print(f"find_{method} took {t1-t0} s")
-        return sorted(results)
 
     @property
     def __geo_interface__(self): pass       # TODO: https://gist.github.com/sgillies/2217756
