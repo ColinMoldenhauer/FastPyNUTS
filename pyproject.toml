@@ -17,6 +17,7 @@ classifiers = [
 ]
 dependencies = [
   "geojson",
+  "numpy",
   "rtree",
   "shapely"
   ]

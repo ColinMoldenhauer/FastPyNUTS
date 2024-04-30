@@ -1,3 +1,4 @@
 geojson
+numpy
 shapely
 rtree
