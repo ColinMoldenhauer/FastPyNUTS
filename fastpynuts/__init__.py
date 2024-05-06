@@ -1,1 +1,1 @@
-from .fastpynuts import *
+from .fastpynuts import NUTSregion, NUTSfinder
