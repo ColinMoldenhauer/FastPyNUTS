@@ -26,6 +26,9 @@ dynamic = ["version", "readme"]
 [tool.setuptools]
 packages = ["fastpynuts"]
 
+[tool.pytest.ini_options]
+pythonpath = "fastpynuts"
+
 [tool.setuptools.dynamic]
 readme = {file = "README.md", content-type = "text/markdown"}
 
