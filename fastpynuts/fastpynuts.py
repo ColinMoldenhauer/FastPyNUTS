@@ -4,7 +4,7 @@ import re
 import geojson
 import numpy as np
 
-from shapely.geometry import Point
+from shapely import intersects_xy
 from rtree import index
 from treelib import Tree
 
@@ -13,17 +13,23 @@ from .utils import geometry2polygon
 
 
 class NUTSregion():
-    # TODO: evaluate impact of redundancy of information
-    def __init__(self, feature):
+    """
+    Hold a NUTS region's geometry and bounding box.
+    """
+    def __init__(self, feature, buffer=None):
         geom_type = feature["geometry"]["type"]
         assert geom_type in ["Polygon", "MultiPolygon"], f"Geometry type must be one of ['Polygon', 'MultiPolygon'], not {geom_type}"
         assert feature["id"] == feature["properties"]["NUTS_ID"]
 
         self.feature = feature
-        self.coordinates = feature["geometry"]["coordinates"]               # list
-        self.geom = geometry2polygon(feature)                               # shapely geometry
-        self.bbox = self.geom.bounds                                        # tuple
-        self.properties = feature["properties"]                             # dict
+        self.buffer = buffer
+        self.coordinates = feature["geometry"]["coordinates"]
+
+        self.geom = geometry2polygon(feature)
+        if buffer: self.geom = self.geom.buffer(buffer)
+
+        self.bbox = self.geom.bounds
+        self.properties = feature["properties"]
 
 
     def __str__(self): return f"NUTS{self.level}: {self.id}"
@@ -52,11 +58,23 @@ class NUTSregion():
 
 
 class NUTSfinder:
-    def __init__(self, geojsonfile, level=None, min_level=0, max_level=3):
+    """
+    Find NUTS regions for a point coordinate `(lon, lat)`. Optionally restrict the NUTS levels of interest.
+
+    **Note**: Points-in-polyon tests via `shapely` may suffer from floating-point precision issues for points on the boundary of regions.
+    A buffer to the regions may be introduced via the `buffer_geoms` keyword to ensure the correct assignment. On the flip-side,
+    a buffer may lead to the assignment of multiple regions for points on the boundary.
+    """
+    def __init__(self, geojsonfile, buffer_geoms=1e-5, min_level=0, max_level=3):
+        assert min_level <= max_level, "`min_level` <= `max_level'"
+        self.min_level = min_level
+        self.max_level = max_level
+
         self.file = geojsonfile
+        self.buffer = buffer_geoms
 
         self.scale, self.year, self.crs = self._parse_filename(geojsonfile)
-        self.regions = self._load_regions(level, min_level, max_level)
+        self.regions = self._load_regions()
         self.tree = self._construct_tree(self.regions)
 
         self.rtree = self._construct_rtree(self.regions)
@@ -80,16 +98,8 @@ class NUTSfinder:
 
     # Utilities
     def _parse_filename(self, file):
-        scale, year, crs = re.search("NUTS_RG_(\d{,2})M_(\d+)_(\d+)", file).groups()
+        scale, year, crs = re.search(r"NUTS_RG_(\d{,2})M_(\d+)_(\d+)", file).groups()
         return int(scale), int(year), int(crs)
-
-    def _set_level(self, level=None, min_level=0, max_level=3):
-        if level:
-            self.min_level = level
-            self.max_level = level
-        else:
-            self.min_level = min_level
-            self.max_level = max_level
 
     def _filter_regions(self, regions):
         filtered = []
@@ -97,23 +107,21 @@ class NUTSfinder:
             if self.min_level <= feature["properties"]["LEVL_CODE"] <= self.max_level:
                 filtered.append(feature)
 
-        regions = [NUTSregion(feature) for feature in filtered]
+        regions = [NUTSregion(feature, self.buffer) for feature in filtered]
         return regions
 
-    def _load_regions(self, level=None, min_level=0, max_level=3):
+    def _load_regions(self):
         with open(self.file, encoding='cp850') as f:
             regions_in = geojson.load(f)
 
-        self._set_level(level, min_level, max_level)
         regions_filtered = self._filter_regions(regions_in)
-
         return sorted(regions_filtered)
 
     def _construct_rtree(self, regions, indices=None, embed_obj=False):
         """
         Construct a fast R-tree based on the regions' bounding boxes.
 
-        Indices should refer to the indices of the region objects in `self.regions`. Will be used to retreive
+        Indices should refer to the indices of the region objects in `self.regions`. They will be used to retrieve
         the region objects from the indices returned by `rtree.index.Index.intersection()`.
 
         Optionally embed the region objects in the rtree nodes. This has negative runtime implications.
@@ -132,7 +140,7 @@ class NUTSfinder:
         tree = Tree()
         tree.create_node(tag="NUTS", identifier="root")
         for i, region in enumerate(regions):
-            if region.level == 0:
+            if region.level == self.min_level:
                 tree.create_node(tag=str(region), identifier=region.id, parent="root", data=region)
             else:
                 parent = region.id[:-1]
@@ -154,7 +162,6 @@ class NUTSfinder:
     def _find_rtree(self, lon, lat, *args, valid_point=False):
         """Find point fast using a R-tree."""
         hits = self._candidates_rtree(lon, lat, self.regions)
-        hits = self._validate_full_NUTS_set(hits)
         hits = self._maybe_validate(lon, lat, hits, valid_point)
         return hits
 
@@ -180,32 +187,23 @@ class NUTSfinder:
             return validate(lon, lat, hits)
 
     def _validate_candidate_set(self, lon, lat, hits):
-        """Assumption: each point either has **max_level - min_level + 1** regions, or **0**."""
-        p = Point((lon, lat))
-
-        max_levels = [hit for hit in hits if hit.level == self.max_level]
-        for region in max_levels:
-            parents = self._get_parents(region.id)
-            if all([p in hits for p in parents]) and region.geom.contains(p):
-                return [*parents, region]
-        return []
-
-    def _validate_full_NUTS_set(self, hits):
         """
         In case of bbox candidate selection, wrong candidates with overlapping bbboxes may be suggested. For NUTS,
         we expect all parent regions to be included in the candidate set. If the parent regions are missing, we can safely discard
-        regions and avoid an unnecessary point-in-polyon test.
+        regions and avoid an unnecessary point-in-polyon test. If no buffer is used, at max one full set of regions can be found.
+        If a buffer is applied to the regions, boundary points might coincide with multiple regions.
         """
-        level3s = [hit for hit in hits if hit.level == self.max_level]
-        full_set = []
-        for region in level3s:
-            parents = self._get_parents(region.id)
-            if all([p in hits for p in parents]):
-                full_set.extend(parents)
-                full_set.append(region)
 
-        full_set = np.unique(full_set).tolist()
-        return full_set
+        max_levels = [hit for hit in hits if hit.level == self.max_level]
+        validated = []
+        for region in max_levels:
+            parents = self._get_parents(region.id)
+            if all([p in hits for p in parents]) and intersects_xy(region.geom, lon, lat):
+                validated.extend([*parents, region])
+                if not self.buffer: return validated
+
+        validated = np.unique(validated).tolist()
+        return validated
 
 
 class NUTSfinderBenchmark(NUTSfinder):
@@ -229,18 +227,13 @@ class NUTSfinderBenchmark(NUTSfinder):
     **poly**:
     Sequentially performs a point-in-polygon test of all regions.
     """
-    def __init__(self, geojsonfile, level=None, min_level=0, max_level=3):
-        self.file = geojsonfile
+    def __init__(self, geojsonfile, buffer_geoms=1e-5, min_level=0, max_level=3):
+        super().__init__(geojsonfile, buffer_geoms, min_level, max_level)
 
-        self.scale, self.year, self.crs = self._parse_filename(geojsonfile)
-        self.regions = self._load_regions(level, min_level, max_level)
-
-        self.rtree = self._construct_rtree(self.regions)
-        self.rtree_obj = self._construct_rtree(self.regions, embed_obj=True)
-
-        self.tree = self._construct_tree(self.regions)
+        # construct additional trees
         self.tree_rtree = self._construct_tree_rtree(self.regions)
         self.tree_rtree_obj = self._construct_tree_rtree_obj(self.regions)
+        self.rtree_obj = self._construct_rtree(self.regions, embed_obj=True)
 
 
     def find(self, lon, lat, method="tree", valid_point=False, verbose=False, **kwargs):
@@ -309,9 +302,8 @@ class NUTSfinderBenchmark(NUTSfinder):
     def _find_poly(self, lon, lat, regions, **kwargs):
         """Naive sequential implementation, testing every region."""
         hits = []
-        p = Point((lon, lat))
         for region in regions:
-            if region.geom.contains(p):
+            if intersects_xy(region.geom, lon, lat):
                 hits.append(region)
         return hits
 
@@ -322,7 +314,6 @@ class NUTSfinderBenchmark(NUTSfinder):
             xmin, ymin, xmax, ymax = region.bbox
             if (xmin <= lon <= xmax) and (ymin <= lat <= ymax):
                 hits.append(region)
-        hits = self._validate_full_NUTS_set(hits)
         hits = self._maybe_validate(lon, lat, hits, valid_point)
 
         return hits
@@ -331,7 +322,6 @@ class NUTSfinderBenchmark(NUTSfinder):
         """Find point using a R-tree. Slower variant of `_find_rtree`, due to direct embedding of objects."""
 
         hits = list(self.rtree_obj.intersection((lon, lat, lon, lat), objects="raw"))
-        hits = self._validate_full_NUTS_set(hits)
         hits = self._maybe_validate(lon, lat, hits, valid_point)
 
         return hits
@@ -348,7 +338,7 @@ class NUTSfinderBenchmark(NUTSfinder):
             if hits:
                 current_node = hits[0].id
             else:
-                # if valid_point: raise ValueError(f"Could not locate point ({lon}, {lat}) despite `valid_point`=True.")
+                if valid_point: raise ValueError(f"Could not locate point ({lon}, {lat}) despite `valid_point = True.`")
                 break
         return out
 
@@ -366,7 +356,7 @@ class NUTSfinderBenchmark(NUTSfinder):
             if hits:
                 current_node = hits[0].id
             else:
-                # if valid_point: raise ValueError(f"Could not locate point ({lon}, {lat}) despite `valid_point`=True.")
+                if valid_point: raise ValueError(f"Could not locate point ({lon}, {lat}) despite `valid_point`=True.")
                 break
         return out
 
@@ -382,6 +372,6 @@ class NUTSfinderBenchmark(NUTSfinder):
             if hits:
                 current_node = hits[0].id
             else:
-                # if valid_point: raise ValueError(f"Could not locate point ({lon}, {lat}) despite `valid_point`=True.")
+                if valid_point: raise ValueError(f"Could not locate point ({lon}, {lat}) despite `valid_point`=True.")
                 break
         return out
