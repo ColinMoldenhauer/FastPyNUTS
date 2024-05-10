@@ -1,3 +1,4 @@
+import os
 import time
 import re
 
@@ -8,6 +9,7 @@ from shapely import intersects_xy
 from rtree import index
 from treelib import Tree
 
+from .download import _download_NUTS
 from .utils import geometry2polygon
 
 
@@ -65,7 +67,7 @@ class NUTSfinder:
     A buffer to the regions may be introduced via the `buffer_geoms` keyword to ensure the correct assignment. On the flip-side,
     a buffer may lead to the assignment of multiple regions for points on the boundary.
     """
-    def __init__(self, geojsonfile, buffer_geoms=1e-5, min_level=0, max_level=3):
+    def __init__(self, geojsonfile, buffer_geoms=0, min_level=0, max_level=3):
         assert min_level <= max_level, "`min_level` <= `max_level'"
         self.min_level = min_level
         self.max_level = max_level
@@ -86,14 +88,40 @@ class NUTSfinder:
     @property
     def __geo_interface__(self): pass       # TODO: https://gist.github.com/sgillies/2217756
 
+    @classmethod
+    def from_web(cls, scale=1, year=2021, epsg=4326, datadir=".data", **kwargs):
+        """
+        Download a NUTS file from Eurostat and construct a `NUTSfinder` object from it. If previously downloaded, use existing file instead.
+        By default, the file will be saved in `.data`. The download location can be changed via the `datadir` keyword.
+        The construction of the finder object can be specified via `kwargs`. For available keyword arguments, see the documentation of `NUTSfinder`.
+        """
+        os.makedirs(datadir, exist_ok=True)
+        file = os.path.join(datadir, f"NUTS_RG_{scale:02d}M_{year}_{epsg}.geojson")
+
+        if os.path.exists(file):
+            return cls(file)
+        else:
+            return cls(_download_NUTS(datadir, scale=scale, year=year, epsg=epsg), **kwargs)
+
 
     def find(self, lon, lat, valid_point=False, **kwargs):
         """
         Find a point's NUTS regions by longitude and latitude.
         For large-scale applications, if it is known, that the point corresponds to a valid location within the NUTS regions, use `valid_point = True` for a speedup.
         """
-        results = self._find_rtree(lon, lat, self.regions, valid_point=valid_point, **kwargs)
+        results = self._find_rtree(lon, lat, self.regions, valid_point=valid_point)
         return sorted(results)
+
+    def find_level(self, lon, lat, level, valid_point=False):
+        """
+        Find specific NUTS levels. `level` may either be an integer or iterable of integers.
+        """
+        if isinstance(level, int): level = [level]
+        assert all([self.min_level <= level_ <= self.max_level for level_ in level]), "All specified levels must be between self.min_level and self.max_level."
+
+        results_all = self.find(lon, lat, valid_point=valid_point)
+        return [result for result in results_all if result.level in level]
+
 
 
     # Utilities
@@ -227,7 +255,7 @@ class NUTSfinderBenchmark(NUTSfinder):
     **poly**:
     Sequentially performs a point-in-polygon test of all regions.
     """
-    def __init__(self, geojsonfile, buffer_geoms=1e-5, min_level=0, max_level=3):
+    def __init__(self, geojsonfile, buffer_geoms=0, min_level=0, max_level=3):
         super().__init__(geojsonfile, buffer_geoms, min_level, max_level)
 
         # construct additional trees
