@@ -1,4 +1,5 @@
 import pytest
+
 from .utils import get_regions
 
 @pytest.mark.parametrize("region", get_regions())

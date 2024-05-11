@@ -1,4 +1,9 @@
 dist/*
+.data
+data/
+
+junit
+
 **.egg-info
 
 **__pycache__**

@@ -1,7 +1,8 @@
 import pytest
 from .utils import get_available_NUTS_files, load_random_points
 
-from fastpynuts.fastpynuts import NUTSfinder, NUTSfinderBenchmark
+from fastpynuts import NUTSfinder
+from fastpynuts.experimental import NUTSfinderBenchmark
 
 
 @pytest.fixture(scope="module")
