@@ -1,5 +1,5 @@
 import os
-import requests
+import urllib.request
 
 
 def _get_NUTS_url(geomtype="RG", scale=1, year=2021, format="geojson", epsg=4326, level=None):
@@ -28,9 +28,8 @@ def _get_NUTS_url(geomtype="RG", scale=1, year=2021, format="geojson", epsg=4326
 
 def _download_NUTS(datadir, filename=None, scale=1, year=2021, epsg=4326):
     filename_NUTS, url = _get_NUTS_url(scale=scale, year=year, epsg=epsg)
-    resp = requests.get(url)
-
-    with open(file := os.path.join(datadir, filename or filename_NUTS), "wb") as f:
-        f.write(resp.content)
+    with urllib.request.urlopen(url) as resp:
+        with open(file := os.path.join(datadir, filename or filename_NUTS), "wb") as f:
+            f.write(resp.read())
 
     return file

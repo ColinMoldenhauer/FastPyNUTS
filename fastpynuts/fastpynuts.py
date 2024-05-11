@@ -1,5 +1,4 @@
 import os
-import time
 import re
 
 import geojson
@@ -11,7 +10,6 @@ from treelib import Tree
 
 from .download import _download_NUTS
 from .utils import geometry2polygon
-
 
 
 class NUTSregion():
