@@ -1,4 +1,0 @@
-geojson
-numpy
-shapely
-rtree
