@@ -17,9 +17,10 @@ classifiers = [
 ]
 dependencies = [
   "geojson",
+  "shapely",
   "numpy",
   "rtree",
-  "shapely"
+  "treelib"
   ]
 dynamic = ["version", "readme"]
 
