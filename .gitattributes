@@ -1,0 +1,2 @@
+# Count jupyter notebook as Python
+*.ipynb linguist-language=Python
