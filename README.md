@@ -3,14 +3,20 @@ A fast implementation of querying the [NUTS - Nomenclature of territorial units 
 
 
 ![Figure: NUTS levels (Eurostat)](img/levels.gif) <br>
-<!-- ![Figure: NUTS levels (Eurostat)](https://github.com/ColinMoldenhauer/FastPyNUTS/blob/main/levels.gif) <br> -->
-_Figure: Eurostat_
-<!-- _Figure: [Eurostat](https://ec.europa.eu/eurostat/web/gisco/geodata/reference-data/administrative-units-statistical-units/nuts)_ -->
+Figure: _Eurostat_
+
+
+## Features
+- fast querying of NUTS regions (~0.3ms/query)
+- find all NUTS regions of a point or query user-defined NUTS-levels (0-3)
+- use your own custom NUTS dataset (other CRS, enriched metadata, etc.)
 
 
 ## Usage
 
-
+### Initialization and finding NUTS regions
+The `NUTSfinder` class is the main tool to determine the NUTS regions of a point. It can be initialized from a local file
+containing the NUTS regions, or via automatic download from [Eurostat](https://gisco-services.ec.europa.eu/distribution/v2/nuts).
 ```python
 from fastpynuts import NUTSfinder
 
@@ -24,20 +30,55 @@ nf = NUTSfinder.from_web(scale=1, year=2021, epsg=4326)
 # find NUTS regions
 point = (11.57, 48.13)
 regions = nf.find(*point)                   # find all regions
-some_regions = nf.find_level(*point, 3)     # only find NUTS-3 regions
+regions3 = nf.find_level(*point, 3)         # only find NUTS-3 regions
+
+region0 = regions[0]
 ```
 
-## Features
-- fast querying of NUTS regions using an R-tree
-- query user-defined NUTS-levels (0-3)
-- use your own custom NUTS dataset (other CRS, ...)
+### Assessing the results
+The NUTS regions will be returned as an ordered list of `NUTSregion` objects.
+```python
+>>> regions
+[NUTS0: DE, NUTS1: DE2, NUTS2: DE21, NUTS3: DE212]
+>>> region0
+NUTS0: DE
+```
 
+Each region object holds information about
+- its ID and NUTS level
+```python
+>>> region0.id
+DE
+>>> region0.level
+0
+```
+- its geometry (a `shapely` Polygon or MultiPolygon) and the corresponding bounding box
+```python
+>>> region0.geom
+<MULTIPOLYGON (((10.454 47.556, 10.44 47.525, 10.441 47.514, 10.432 47.504, ...>
+>>> region0.bbox
+(5.867697, 47.270114, 15.04116, 55.058165)
+```
+- further fields from the NUTS dataset
+```python
+{
+    "NUTS_ID": "DE",
+    "LEVL_CODE": 0,
+    "CNTR_CODE": "DE",
+    "NAME_LATN": "Deutschland",
+    "NUTS_NAME": "Deutschland",
+    "MOUNT_TYPE": 0,
+    "URBN_TYPE": 0,
+    "COAST_TYPE": 0,
+    "FID": "DE"
+}
+```
 
 ## Installation
 ```cmd
 pip install fastpynuts
 ```
-`FastPyNUTS` requires `geojson`, `numpy`, `shapely`, `treelib` and `rtree`
+`FastPyNUTS` requires `numpy`, `shapely`, `treelib` and `rtree`
 
 
 
@@ -56,7 +97,23 @@ regions = nf.find(*point, valid_point=True)
 
 
 ## Runtime Comparison
-![benchmark](img/benchmark.png)
+`FastPyNUTS` is optimized for query speed and result correctness, at the expense of more expensive initialization time.
+
+A R-tree-based approach proved to be the fastest option:
+<table>
+ <tr>
+    <td> <img src="img/benchmark_1.png" alt="Benchmark for scale 1."> </td>
+    <td> <img src="img/benchmark_20_zoom.png" alt="Benchmark for scale 1."> </td>
+  </tr>
+</table>
+
+Compared to other packages like [nuts-finder](https://github.com/nestauk/nuts_finder)
+![](img/benchmark_other.png)
+
+**Tips**:
+- if interested only in certain levels (0-3) of the NUTS dataset, initialize the `NUTSfinder` using its `min_level` and `max_level` arguments
+- if it's known beforehand that the queried point lies within the interior of a NUTS region, use `find(valid_point=True)`
+
 For a full runtime analysis, see [benchmark.ipynb](benchmark.ipynb)
 
 

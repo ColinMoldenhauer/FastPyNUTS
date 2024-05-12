@@ -1,5 +1,8 @@
 import time
 
+from shapely import intersects_xy
+from treelib import Tree
+
 from .fastpynuts import NUTSfinder
 
 

@@ -1,7 +1,7 @@
+import json
 import os
 import re
 
-import geojson
 import numpy as np
 
 from shapely import intersects_xy
@@ -83,8 +83,6 @@ class NUTSfinder:
 
     def __len__(self): return len(self.regions)
 
-    @property
-    def __geo_interface__(self): pass       # TODO: https://gist.github.com/sgillies/2217756
 
     @classmethod
     def from_web(cls, scale=1, year=2021, epsg=4326, datadir=".data", **kwargs):
@@ -127,9 +125,9 @@ class NUTSfinder:
         scale, year, crs = re.search(r"NUTS_RG_(\d{,2})M_(\d+)_(\d+)", file).groups()
         return int(scale), int(year), int(crs)
 
-    def _filter_regions(self, regions):
+    def _filter_regions(self, fc):
         filtered = []
-        for feature in regions["features"]:
+        for feature in fc["features"]:
             if self.min_level <= feature["properties"]["LEVL_CODE"] <= self.max_level:
                 filtered.append(feature)
 
@@ -138,9 +136,9 @@ class NUTSfinder:
 
     def _load_regions(self):
         with open(self.file, encoding='cp850') as f:
-            regions_in = geojson.load(f)
+            fc = json.load(f)
 
-        regions_filtered = self._filter_regions(regions_in)
+        regions_filtered = self._filter_regions(fc)
         return sorted(regions_filtered)
 
     def _construct_rtree(self, regions, indices=None, embed_obj=False):
