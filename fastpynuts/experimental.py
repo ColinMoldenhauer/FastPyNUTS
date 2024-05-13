@@ -1,3 +1,8 @@
+"""
+The submodule `fastpynuts.experimental` contains `NUTSfinderBenchmark`, a class which is intended for
+experimental purposes.
+"""
+
 import time
 
 from shapely import intersects_xy
@@ -26,6 +31,7 @@ class NUTSfinderBenchmark(NUTSfinder):
 
     **poly**:
     Sequentially performs a point-in-polygon test of all regions.
+
     """
     def __init__(self, geojsonfile, buffer_geoms=0, min_level=0, max_level=3):
         super().__init__(geojsonfile, buffer_geoms, min_level, max_level)

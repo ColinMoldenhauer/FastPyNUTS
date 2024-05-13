@@ -1,9 +1,14 @@
+"""
+Contains utilities for the automatic download of NUTS files.
+"""
+
 import os
 import urllib.request
 
 
-def _get_NUTS_url(geomtype="RG", scale=1, year=2021, format="geojson", epsg=4326, level=None):
+def get_NUTS_url(geomtype="RG", scale=1, year=2021, format="geojson", epsg=4326, level=None):
     """
+    Create the URL to a NUTS file in the Eurostat API.
     For a specification of the parameters, see https://gisco-services.ec.europa.eu/distribution/v2/nuts/nuts-2021-files.html
     Download of CSV is not supported due to different signature.
     """
@@ -26,10 +31,12 @@ def _get_NUTS_url(geomtype="RG", scale=1, year=2021, format="geojson", epsg=4326
     return filename, url
 
 
-def _download_NUTS(datadir, filename=None, scale=1, year=2021, epsg=4326):
-    filename_NUTS, url = _get_NUTS_url(scale=scale, year=year, epsg=epsg)
+def download_NUTS(datadir, filename=None, scale=1, year=2021, epsg=4326):
+    """
+    Download a NUTS file from the Eurostat API and save to file.
+    """
+    filename_NUTS, url = get_NUTS_url(scale=scale, year=year, epsg=epsg)
     with urllib.request.urlopen(url) as resp:
         with open(file := os.path.join(datadir, filename or filename_NUTS), "wb") as f:
             f.write(resp.read())
-
     return file

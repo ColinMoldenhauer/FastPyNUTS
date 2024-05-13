@@ -1,3 +1,7 @@
+"""
+This submodule defines the core functionality of `fastpynuts`.
+"""
+
 import json
 import os
 import re
@@ -8,15 +12,31 @@ from shapely import intersects_xy
 from rtree import index
 from treelib import Tree
 
-from .download import _download_NUTS
+from .download import download_NUTS
 from .utils import geometry2polygon
 
 
 class NUTSregion():
     """
-    Hold a NUTS region's geometry and bounding box.
+    Hold a NUTS region's geometry and bounding box for efficient querying.
+    Properties from the NUTS dataset are accessible via the `properties` attribute.
+
     """
     def __init__(self, feature, buffer=None):
+        """
+        Construct a `NUTSregion` from a geojson-like feature like
+        ```python
+        feature = {
+            'type': 'Feature',
+            'geometry': {
+                'type': 'MultiPolygon',
+                'coordinates': [[[[x1, y1], ..., [xN, yN]]]]
+            },
+            'properties': {"NUTS_ID": "DE", ...}
+        }
+        ```
+
+        """
         geom_type = feature["geometry"]["type"]
         assert geom_type in ["Polygon", "MultiPolygon"], f"Geometry type must be one of ['Polygon', 'MultiPolygon'], not {geom_type}"
         assert feature["id"] == feature["properties"]["NUTS_ID"]
@@ -40,30 +60,36 @@ class NUTSregion():
 
     def __lt__(self, other): return (self.level < other.level) or (self.level == other.level and self.id < other.id)
 
+    @property
+    def id(self) -> str:
+        """The region's ID as specified by the field `NUTS_ID`. E.g. 'DE'"""
+        return self.properties["NUTS_ID"]
 
     @property
-    def id(self): return self.properties["NUTS_ID"]
+    def level(self) -> int:
+        """The region's level as specified by the field `LEVL_CODE`. E.g. 0"""
+        return self.properties["LEVL_CODE"]
 
     @property
-    def level(self): return self.properties["LEVL_CODE"]
+    def type(self) -> str:
+        """The region's feature type as specified by the geometry. Either `'Polygon'` or `'MultiPolygon'`."""
+        return self.feature["type"]
 
     @property
-    def type(self): return self.feature["type"]
-
-    @property
-    def is_multi(self): return self.type == "MultiPolygon"
-
-    @property
-    def __geo_interface__(self): return self.feature
+    def __geo_interface__(self) -> dict:
+        """The region's feature as specified by the [\_\_geo_interface\_\_](https://gist.github.com/sgillies/2217756) specification."""
+        return self.feature
 
 
 class NUTSfinder:
     """
     Find NUTS regions for a point coordinate `(lon, lat)`. Optionally restrict the NUTS levels of interest.
+    Custom input files must follow the official NUTS naming convention.
 
     **Note**: Points-in-polyon tests via `shapely` may suffer from floating-point precision issues for points on the boundary of regions.
     A buffer to the regions may be introduced via the `buffer_geoms` keyword to ensure the correct assignment. On the flip-side,
     a buffer may lead to the assignment of multiple regions for points on the boundary.
+
     """
     def __init__(self, geojsonfile, buffer_geoms=0, min_level=0, max_level=3):
         assert min_level <= max_level, "`min_level` <= `max_level'"
@@ -97,10 +123,10 @@ class NUTSfinder:
         if os.path.exists(file):
             return cls(file)
         else:
-            return cls(_download_NUTS(datadir, scale=scale, year=year, epsg=epsg), **kwargs)
+            return cls(download_NUTS(datadir, scale=scale, year=year, epsg=epsg), **kwargs)
 
 
-    def find(self, lon, lat, valid_point=False, **kwargs):
+    def find(self, lon, lat, valid_point=False, **kwargs) -> list:
         """
         Find a point's NUTS regions by longitude and latitude.
         For large-scale applications, if it is known, that the point corresponds to a valid location within the NUTS regions, use `valid_point = True` for a speedup.
@@ -108,7 +134,7 @@ class NUTSfinder:
         results = self._find_rtree(lon, lat, self.regions, valid_point=valid_point)
         return sorted(results)
 
-    def find_level(self, lon, lat, level, valid_point=False):
+    def find_level(self, lon, lat, level, valid_point=False) -> list:
         """
         Find specific NUTS levels. `level` may either be an integer or iterable of integers.
         """
