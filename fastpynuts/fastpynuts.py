@@ -77,7 +77,7 @@ class NUTSregion():
 
     @property
     def __geo_interface__(self) -> dict:
-        """The region's feature as specified by the [\_\_geo_interface\_\_](https://gist.github.com/sgillies/2217756) specification."""
+        r"""The region's feature as specified by the [\_\_geo_interface\_\_](https://gist.github.com/sgillies/2217756) specification."""
         return self.feature
 
 

@@ -1,10 +1,10 @@
-nbformat
-nbconvert
-myst-parser
-jupyter
 sphinx
 sphinx-autodoc-typehints
 sphinx-autodoc2
 sphinx-rtd-theme
 nbsphinx
 linkify-it-py
+nbformat
+nbconvert
+myst-parser
+jupyter
