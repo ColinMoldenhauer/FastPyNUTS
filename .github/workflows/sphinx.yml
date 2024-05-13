@@ -13,8 +13,7 @@ jobs:
       with:
         python-version: '3.11'
         cache: 'pip'
-    - run: pip install -r requirements.txt
-    - run: pip test
+    - run: pip install -r requirements_build.txt
     - name: Build HTML
       uses: ammaraskar/sphinx-action@master
     - name: Upload artifacts
