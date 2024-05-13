@@ -1,6 +1,6 @@
 import pytest
 
-from fastpynuts.download import _get_NUTS_url
+from fastpynuts.download import get_NUTS_url
 
 @pytest.mark.parametrize("input, expected", [
 
@@ -39,7 +39,7 @@ from fastpynuts.download import _get_NUTS_url
     [{"format": "GeoJSON"}, "https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_01M_2021_4326.geojson"],
 ])
 def test_urls(input, expected):
-    assert _get_NUTS_url(**input)[1] == expected
+    assert get_NUTS_url(**input)[1] == expected
 
 @pytest.mark.parametrize("input", [
     {"geomtype": "some_type"},
@@ -55,4 +55,4 @@ def test_urls(input, expected):
 ])
 def test_wrong_parameters(input):
     with pytest.raises(AssertionError):
-        _get_NUTS_url(**input)
+        get_NUTS_url(**input)

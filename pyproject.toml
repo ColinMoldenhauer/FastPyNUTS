@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Fast-PyNUTS"
+name = "fastpynuts"
 authors = [
   { name="Colin Moldenhauer", email="colin.moldenhauer@tum.de" },
   { name="Michael Engel", email="m.engel@tum.de" },

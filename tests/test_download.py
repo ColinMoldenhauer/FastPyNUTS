@@ -2,7 +2,7 @@ import os
 import pytest
 
 from fastpynuts import NUTSfinder
-from fastpynuts.download import _download_NUTS
+from fastpynuts.download import download_NUTS
 
 
 @pytest.mark.parametrize("input", [
@@ -13,7 +13,7 @@ from fastpynuts.download import _download_NUTS
 ])
 class TestDownload:
     def test_file(self, tmp_path, input):
-        file = _download_NUTS(tmp_path, **input)
+        file = download_NUTS(tmp_path, **input)
         assert os.path.exists(file)
 
     def test_nf(self, tmp_path, input):
