@@ -9,7 +9,7 @@ jobs:
       contents: write
     steps:
     - uses: actions/checkout@v4
-    - name: Install dependencies
+    - name: Install dependencies pip
       run: |
         python -m pip install --upgrade pip
         python -m pip install -r requirements_build.txt
