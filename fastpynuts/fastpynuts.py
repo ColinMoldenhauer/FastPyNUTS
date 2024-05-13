@@ -99,7 +99,7 @@ class NUTSfinder:
         self.file = geojsonfile
         self.buffer = buffer_geoms
 
-        self.scale, self.year, self.crs = self._parse_filename(geojsonfile)
+        self.scale, self.year, self.epsg = self._parse_filename(geojsonfile)
         self.regions = self._load_regions()
         self.tree = self._construct_tree(self.regions)
 
@@ -108,6 +108,16 @@ class NUTSfinder:
     def __getitem__(self, idx): return self.regions[idx]
 
     def __len__(self): return len(self.regions)
+
+    def __str__(self): return f"NUTSfinder (scale: {self.scale}, year: {self.year}, EPSG: {self.epsg}, levels: {self.min_level}-{self.max_level})"
+
+    def __repr__(self):
+        return f"NUTSfinder (scale: {self.scale}, year: {self.year}, EPSG: {self.epsg})\n" \
+                f"   ├─ regions: [{self[0]}, ..., {self[-1]}] ({len(self):d})\n" \
+                f"   ├─ min_level:  {self.min_level:d}\n" \
+                f"   ├─ max_level:  {self.max_level:d}\n" \
+                f"   ├─ buffer:     {self.buffer:e}\n" \
+                f"   {self.file}"
 
 
     @classmethod
@@ -148,8 +158,11 @@ class NUTSfinder:
 
     # Utilities
     def _parse_filename(self, file):
-        scale, year, crs = re.search(r"NUTS_RG_(\d{,2})M_(\d+)_(\d+)", file).groups()
-        return int(scale), int(year), int(crs)
+        try:
+            scale, year, epsg = re.search(r"NUTS_RG_(\d{,2})M_(\d+)_(\d+)", file).groups()
+        except:
+            raise ValueError(f"Input file {file} could not be parsed. Files must follow Eurostat's naming convention, e.g. NUTS_RG_<SCALE>M_<YEAR>_<EPSG>.geojson)")
+        return int(scale), int(year), int(epsg)
 
     def _filter_regions(self, fc):
         filtered = []
