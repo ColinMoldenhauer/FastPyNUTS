@@ -17,4 +17,4 @@ class TestDownload:
         assert os.path.exists(file)
 
     def test_nf(self, tmp_path, input):
-        nf = NUTSfinder.from_web(**input)
+        nf = NUTSfinder.from_web(datadir=tmp_path, **input)
