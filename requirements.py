@@ -1,3 +1,0 @@
-geojson
-shapely
-rtree

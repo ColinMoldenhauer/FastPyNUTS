@@ -1,3 +1,11 @@
-**__pycache__**
-**.egg-info
 dist/*
+docs/build/*
+.data
+data/
+
+junit
+
+**.egg-info
+
+**__pycache__**
+**ipynb_checkpoints**

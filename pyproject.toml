@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Fast-PyNUTS"
+name = "fastpynuts"
 authors = [
   { name="Colin Moldenhauer", email="colin.moldenhauer@tum.de" },
   { name="Michael Engel", email="m.engel@tum.de" },
@@ -16,14 +16,20 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "geojson",
+  "shapely",
+  "numpy",
   "rtree",
-  "shapely"
+  "treelib"
   ]
+keywords = ["eurostat", "NUTS", "nomenclature of territorial units for statistics"]
+
 dynamic = ["version", "readme"]
 
 [tool.setuptools]
 packages = ["fastpynuts"]
+
+[tool.pytest.ini_options]
+pythonpath = "fastpynuts"
 
 [tool.setuptools.dynamic]
 readme = {file = "README.md", content-type = "text/markdown"}
