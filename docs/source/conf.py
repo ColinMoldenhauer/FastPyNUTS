@@ -79,7 +79,7 @@ myst_enable_extensions = [
 project = 'fastpynuts'
 copyright = '2024, Colin Moldenhauer, meengel'
 author = 'Colin Moldenhauer, meengel'
-release = '0.2.0'
+release = 'latest'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
