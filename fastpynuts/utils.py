@@ -2,20 +2,25 @@
 Contains miscellaneous utilities.
 """
 
-from shapely.geometry import Polygon, MultiPolygon, MultiPoint
+from shapely.geometry import shape
+from shapely.errors import GeometryTypeError
 
 
-def geometry2polygon(feature):
+def geometry2shapely(geometry):
     """
-    Convert the geometry given by dictionary `feature` to a `shapely` geometry.
+    Convert the geometry given by dictionary `geometry` to a `shapely` geometry using
+    [shapely's `shape`](https://shapely.readthedocs.io/en/stable/manual.html#shapely.geometry.shape).
+    Additionally allows to pass a GeoJSON feature containing
+
+    Supported geometry types:
+    - Polygon
+    - MultiPolygon
+    - MultiPoint
+    - a GeoJSON feature containing one of the above valid geometries
     """
-    geometry = feature["geometry"]
-    if geometry["type"]=="Polygon":
-        poly = Polygon(geometry["coordinates"][0], holes=geometry["coordinates"][1:])
-    elif geometry["type"]=="MultiPolygon":
-        poly = MultiPolygon([Polygon(coord[0], holes=coord[1:]) for coord in geometry["coordinates"]])
-    elif geometry["type"]=="MultiPoint":
-        poly = MultiPoint(geometry["coordinates"])
-    else:
-        raise NotImplementedError(f'geometry2polygon: type {geometry["type"]} not supported yet!')
+    try:
+        poly = shape(geometry)
+    except GeometryTypeError:
+        poly = shape(geometry["geometry"])
+
     return poly

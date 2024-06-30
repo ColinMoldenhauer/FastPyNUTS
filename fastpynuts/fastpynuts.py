@@ -8,12 +8,12 @@ import re
 
 import numpy as np
 
-from shapely import intersects_xy
+from shapely import Polygon, intersects, intersects_xy, is_geometry
 from rtree import index
 from treelib import Tree
 
 from .download import download_NUTS
-from .utils import geometry2polygon
+from .utils import geometry2shapely
 
 
 class NUTSregion():
@@ -45,7 +45,7 @@ class NUTSregion():
         self.buffer = buffer
         self.coordinates = feature["geometry"]["coordinates"]
 
-        self.geom = geometry2polygon(feature)
+        self.geom = geometry2shapely(feature)
         if buffer: self.geom = self.geom.buffer(buffer)
 
         self.bbox = self.geom.bounds
@@ -144,15 +144,42 @@ class NUTSfinder:
         results = self._find_rtree(lon, lat, self.regions, valid_point=valid_point)
         return sorted(results)
 
-    def find_level(self, lon, lat, level, valid_point=False) -> list:
-        """
-        Find specific NUTS levels. `level` may either be an integer or iterable of integers.
-        """
-        if isinstance(level, int): level = [level]
-        assert all([self.min_level <= level_ <= self.max_level for level_ in level]), "All specified levels must be between self.min_level and self.max_level."
+    def find_geometry(self, geom):
+        """Find NUTS regions overlapping with a geometry.
 
-        results_all = self.find(lon, lat, valid_point=valid_point)
-        return [result for result in results_all if result.level in level]
+        `geom` must be either a `shapely` geometry that supports `shapely.intersects` or must be
+        a GeoJSON-like geometry that can be converted into such a `shapely` geometry. See `utils.geometry2shapely`
+        for info on supported formats of `geom`.
+        """
+        results = self._find_rtree_geom(geom)
+        return sorted(results)
+
+    def find_bbox(self, lon_min, lat_min, lon_max, lat_max):
+        """Find NUTS regions overlapping with a rectangle (format `(lon_min, lat_min, lon_max, lat_max)`)."""
+        geom = Polygon([
+            (lon_min, lat_min),
+            (lon_min, lat_max),
+            (lon_max, lat_max),
+            (lon_max, lat_min)
+        ])
+        results = self._find_rtree_geom(geom)
+        return sorted(results)
+
+
+    @staticmethod
+    def filter_levels(regions, *levels):
+        """
+        Filter the results of a `find` operation for specific NUTS levels.
+
+        # Usage
+        ```python
+        regions = nf.find_bbox((13.1, 47.2, 14.2, 49.0))
+
+        level3 = nf.filter_levels(regions, 3)
+        level2or3 = nf.filter_levels(regions, 2, 3)
+        ```
+        """
+        return [result for result in regions if result.level in levels]
 
 
 
@@ -223,12 +250,29 @@ class NUTSfinder:
 
     # finding utilities
     def _find_rtree(self, lon, lat, *args, valid_point=False):
-        """Find point fast using a R-tree."""
+        """Find point's regions fast using a R-tree."""
         hits = self._candidates_rtree(lon, lat, self.regions)
         hits = self._maybe_validate(lon, lat, hits, valid_point)
         return hits
 
-    def _candidates_rtree(self, lon, lat, regions):
+
+    def _find_rtree_geom(self, geom, *args):
+        """Find polygon's regions fast using a R-tree."""
+        if not is_geometry(geom):
+            geom = geometry2shapely(geom)
+        lon_min, lat_min, lon_max, lat_max = geom.bounds
+        hits = self._candidates_rtree(lon_min, lat_min, self.regions, lon_max=lon_max, lat_max=lat_max)
+        hits = self._validate_geometry(geom, hits)
+        return hits
+
+    def _candidates_rtree(self, lon_min, lat_min, regions, lon_max=None, lat_max=None):
+        """Determine the candidate regions by R-tree intersection with a point or rectangle."""
+        if lon_max is None: lon_max = lon_min
+        if lat_max is None: lat_max = lat_min
+
+        hits = [regions[i] for i in self.rtree.intersection((lon_min, lat_min, lon_max, lat_max))]
+        return hits
+
         """Determine the candidate regions by R-tree intersection."""
         hits = [regions[i] for i in self.rtree.intersection((lon, lat, lon, lat))]
         return hits
@@ -264,6 +308,22 @@ class NUTSfinder:
             if all([p in hits for p in parents]) and intersects_xy(region.geom, lon, lat):
                 validated.extend([*parents, region])
                 if not self.buffer: return validated
+
+        validated = np.unique(validated).tolist()
+        return validated
+
+    def _validate_geometry(self, geom, hits):
+        """
+        The bounding boxes of a queried polygon might overlap with more regions, than the polygon does.
+        Therefore, all candidate regions are checked via a polygon intersection test, by testing all regions of the highest level.
+        """
+
+        max_levels = [hit for hit in hits if hit.level == self.max_level]
+        validated = []
+        for region in max_levels:
+            parents = self._get_parents(region.id)
+            if all([p in hits for p in parents]) and intersects(region.geom, geom):
+                validated.extend([*parents, region])
 
         validated = np.unique(validated).tolist()
         return validated
