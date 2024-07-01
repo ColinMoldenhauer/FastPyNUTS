@@ -81,6 +81,7 @@ copyright = '2024, Colin Moldenhauer, meengel'
 author = 'Colin Moldenhauer, meengel'
 release = 'latest'
 
+
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 

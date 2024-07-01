@@ -15,7 +15,6 @@ from treelib import Tree
 from .download import download_NUTS
 from .utils import geometry2shapely
 
-
 class NUTSregion():
     """
     Hold a NUTS region's geometry and bounding box for efficient querying.
@@ -255,7 +254,6 @@ class NUTSfinder:
         hits = self._maybe_validate(lon, lat, hits, valid_point)
         return hits
 
-
     def _find_rtree_geom(self, geom, *args):
         """Find polygon's regions fast using a R-tree."""
         if not is_geometry(geom):
@@ -271,10 +269,6 @@ class NUTSfinder:
         if lat_max is None: lat_max = lat_min
 
         hits = [regions[i] for i in self.rtree.intersection((lon_min, lat_min, lon_max, lat_max))]
-        return hits
-
-        """Determine the candidate regions by R-tree intersection."""
-        hits = [regions[i] for i in self.rtree.intersection((lon, lat, lon, lat))]
         return hits
 
     def _maybe_validate(self, lon, lat, hits, valid_point, expected_hits=None, validation_method="_validate_candidate_set"):
