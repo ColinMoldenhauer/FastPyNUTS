@@ -16,7 +16,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "shapely",
+  "shapely >= 2.0",
   "numpy",
   "rtree",
   "treelib"
