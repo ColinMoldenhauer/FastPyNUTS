@@ -17,7 +17,7 @@ def get_NUTS_url(geomtype="RG", scale=1, year=2021, format="geojson", epsg=4326,
 
     assert geomtype in {"RG", "BN", "LB"}
     assert scale in {1, 3, 10, 20, 60}
-    assert year in {2021, 2016, 2013, 2010, 2006, 2003}
+    assert year in {2024, 2021, 2016, 2013, 2010, 2006, 2003}
     assert format in {"geojson", "pbf", "shp", "svg", "topojson"}
     assert epsg in {4326, 3035, 3857}
     if level is not None: assert level in {0, 1, 2, 3}
