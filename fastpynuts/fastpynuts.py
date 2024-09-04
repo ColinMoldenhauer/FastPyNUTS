@@ -38,7 +38,6 @@ class NUTSregion():
         """
         geom_type = feature["geometry"]["type"]
         assert geom_type in ["Polygon", "MultiPolygon"], f"Geometry type must be one of ['Polygon', 'MultiPolygon'], not {geom_type}"
-        assert feature["id"] == feature["properties"]["NUTS_ID"]
 
         self.feature = feature
         self.buffer = buffer
