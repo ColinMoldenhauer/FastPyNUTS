@@ -35,11 +35,11 @@ nf = NUTSfinder.from_web(scale=1, year=2021, epsg=4326)
 
 
 # find NUTS regions
-point = (11.57, 48.13)
+point = (11.57, 48.13)                      # lon, lat
 regions = nf.find(*point)                   # find all regions via a point
 
 bbox = (11.57, 48.13, 11.62, 49.)           # lon_min, lat_min, lon_max, lat_max
-regions = nf.find_bbox()                    # find all regions via a bbox
+regions = nf.find_bbox(*bbox)               # find all regions via a bbox
 
 geom = {
     "type": "Polygon",
@@ -52,7 +52,7 @@ geom = {
         ]
     ]
 }
-regions = nf.find_bbox()                    # find all regions via a GeoJSON geometry (supports shapely geometries and all objects that can be converted into one)
+regions = nf.find_geometry(geom)            # find all regions via a GeoJSON geometry (supports shapely geometries and all objects that can be converted into one)
 
 
 # filter for regions of specific levels
