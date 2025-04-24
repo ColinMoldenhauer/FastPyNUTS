@@ -31,11 +31,11 @@ def get_NUTS_url(geomtype="RG", scale=1, year=2021, format="geojson", epsg=4326,
     return filename, url
 
 
-def download_NUTS(datadir, filename=None, scale=1, year=2021, epsg=4326):
+def download_NUTS(datadir, filename=None, scale=1, year=2021, epsg=4326, level=None):
     """
     Download a NUTS file from the Eurostat API and save to file.
     """
-    filename_NUTS, url = get_NUTS_url(scale=scale, year=year, epsg=epsg)
+    filename_NUTS, url = get_NUTS_url(scale=scale, year=year, epsg=epsg, level=level)
     with urllib.request.urlopen(url) as resp:
         with open(file := os.path.join(datadir, filename or filename_NUTS), "wb") as f:
             f.write(resp.read())

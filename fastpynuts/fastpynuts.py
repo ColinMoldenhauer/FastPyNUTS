@@ -126,7 +126,7 @@ class NUTSfinder:
 
 
     @classmethod
-    def from_web(cls, scale=1, year=2021, epsg=4326, datadir=".data", **kwargs):
+    def from_web(cls, scale=1, year=2021, epsg=4326, level=None, datadir=".data", **kwargs):
         """
         Download a NUTS file from Eurostat and construct a `NUTSfinder` object from it. If previously downloaded, use existing file instead.
         By default, the file will be saved in `.data`. The download location can be changed via the `datadir` keyword.
@@ -135,10 +135,14 @@ class NUTSfinder:
         os.makedirs(datadir, exist_ok=True)
         file = os.path.join(datadir, f"NUTS_RG_{scale:02d}M_{year}_{epsg}.geojson")
 
+        # override potential level information in kwargs incase of only one level loaded
+        if level is not None:
+            kwargs.update(dict(min_level=level, max_level=level))
+
         if os.path.exists(file):
             return cls(file, **kwargs)
         else:
-            return cls(download_NUTS(datadir, scale=scale, year=year, epsg=epsg), **kwargs)
+            return cls(download_NUTS(datadir, scale=scale, year=year, epsg=epsg, level=level), **kwargs)
 
 
     def to_geojson(self, geojsonfile):
