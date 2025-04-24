@@ -5,14 +5,15 @@ This submodule defines the core functionality of `fastpynuts`.
 import json
 import os
 import re
+import tempfile
 
 import numpy as np
 
-from shapely import Polygon, intersects, intersects_xy, is_geometry
+from shapely import Polygon, GeometryCollection, intersects, intersects_xy, is_geometry
 from rtree import index
 from treelib import Tree
 
-from .download import download_NUTS
+from .download import download_NUTS, get_NUTS_url
 from .utils import geometry2shapely
 
 class NUTSregion():
@@ -89,7 +90,7 @@ class NUTSfinder:
     a buffer may lead to the assignment of multiple regions for points on the boundary.
 
     """
-    def __init__(self, geojsonfile, buffer_geoms=0, min_level=0, max_level=3):
+    def __init__(self, geojsonfile, buffer_geoms=None, min_level=0, max_level=3):
         assert min_level <= max_level, "`min_level` <= `max_level'"
         self.min_level = min_level
         self.max_level = max_level
@@ -110,16 +111,23 @@ class NUTSfinder:
     def __str__(self): return f"NUTSfinder (scale: {self.scale}, year: {self.year}, EPSG: {self.epsg}, levels: {self.min_level}-{self.max_level})"
 
     def __repr__(self):
+        buffer_str = f"{self.buffer:e}" if self.buffer is not None else f"{self.buffer}"
         return f"NUTSfinder (scale: {self.scale}, year: {self.year}, EPSG: {self.epsg})\n" \
-                f"   ├─ regions: [{self[0]}, ..., {self[-1]}] ({len(self):d})\n" \
+                f"   ├─ regions: [{self[0]}, ..., {self[-1]}] (length {len(self):d})\n" \
                 f"   ├─ min_level:  {self.min_level:d}\n" \
                 f"   ├─ max_level:  {self.max_level:d}\n" \
-                f"   ├─ buffer:     {self.buffer:e}\n" \
-                f"   {self.file}"
+                f"   ├─ buffer:     {buffer_str}\n" \
+                f"   └ file:        {self.file}"
+
+    @property
+    def __geo_interface__(self):
+        r"""The NUTSfinder represented as a `FeatureCollection` dict."""
+        gc = self.to_geometry_collection()
+        return gc.__geo_interface__
 
 
     @classmethod
-    def from_web(cls, scale=1, year=2021, epsg=4326, datadir=".data", **kwargs):
+    def from_web(cls, scale=1, year=2021, epsg=4326, level=None, datadir=".data", force_reload=False, temporary=False, **kwargs):
         """
         Download a NUTS file from Eurostat and construct a `NUTSfinder` object from it. If previously downloaded, use existing file instead.
         By default, the file will be saved in `.data`. The download location can be changed via the `datadir` keyword.
@@ -128,10 +136,44 @@ class NUTSfinder:
         os.makedirs(datadir, exist_ok=True)
         file = os.path.join(datadir, f"NUTS_RG_{scale:02d}M_{year}_{epsg}.geojson")
 
-        if os.path.exists(file):
-            return cls(file)
+        # override potential level information in kwargs incase of only one level loaded
+        if level is not None:
+            kwargs.update(dict(min_level=level, max_level=level))
+
+        if os.path.exists(file) and not force_reload:
+            return cls(file, **kwargs)
         else:
-            return cls(download_NUTS(datadir, scale=scale, year=year, epsg=epsg), **kwargs)
+            if temporary:
+                # get filename for prefix determination
+                filename_NUTS, url = get_NUTS_url(scale=scale, year=year, epsg=epsg, level=level)
+
+                # use prefix to allow for proper filename parsing
+                fd, temp_path = tempfile.mkstemp(prefix=os.path.splitext(filename_NUTS)[0])
+                try:
+                    instance = cls(download_NUTS("", filename=temp_path, scale=scale, year=year, epsg=epsg, level=level), **kwargs)
+                finally:
+                    # manually close file and delete after instance creation
+                    os.close(fd)
+                    os.remove(temp_path)
+            else:
+                instance = cls(download_NUTS(datadir, scale=scale, year=year, epsg=epsg, level=level), **kwargs)
+            return instance
+
+
+    def to_geometry_collection(self):
+        """Construct a shapely `GeometryCollection` from the finder's regions."""
+        gc = GeometryCollection([region_.geom for region_ in self.regions])
+        return gc
+
+
+    def to_geojson(self, geojsonfile):
+        """
+        Write the NUTSfinder's regions to file as a FeatureCollection.
+        Useful if the input dataset has been altered, i.e. by buffering, filtering, etc.
+        """
+        fc = self.__geo_interface__
+        with open(geojsonfile, "w") as f:
+            json.dump(fc, f)
 
 
     def find(self, lon, lat, valid_point=False, **kwargs) -> list:
@@ -307,7 +349,7 @@ class NUTSfinder:
 
     def _validate_geometry(self, geom, hits):
         """
-        The bounding boxes of a queried polygon might overlap with more regions, than the polygon does.
+        The bounding boxes of a queried polygon might overlap with more regions than the polygon does.
         Therefore, all candidate regions are checked via a polygon intersection test, by testing all regions of the highest level.
         """
 

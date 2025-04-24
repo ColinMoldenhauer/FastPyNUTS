@@ -1,0 +1,16 @@
+name: Trigger RTD Build
+
+on:
+  push:
+    branches:
+      - main  # or your desired branch
+
+jobs:
+  trigger-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Read the Docs Build
+        run: |
+          curl -X POST \
+            -H "Authorization: Token ${{ secrets.RTD_API_TOKEN }}" \
+            https://readthedocs.org/api/v3/projects/fastpynuts/versions/latest/builds/
