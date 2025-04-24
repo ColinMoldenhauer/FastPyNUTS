@@ -126,7 +126,7 @@ class NUTSfinder:
 
 
     @classmethod
-    def from_web(cls, scale=1, year=2021, epsg=4326, level=None, datadir=".data", **kwargs):
+    def from_web(cls, scale=1, year=2021, epsg=4326, level=None, datadir=".data", force_reload=False, **kwargs):
         """
         Download a NUTS file from Eurostat and construct a `NUTSfinder` object from it. If previously downloaded, use existing file instead.
         By default, the file will be saved in `.data`. The download location can be changed via the `datadir` keyword.
@@ -139,7 +139,7 @@ class NUTSfinder:
         if level is not None:
             kwargs.update(dict(min_level=level, max_level=level))
 
-        if os.path.exists(file):
+        if os.path.exists(file) and not force_reload:
             return cls(file, **kwargs)
         else:
             return cls(download_NUTS(datadir, scale=scale, year=year, epsg=epsg, level=level), **kwargs)
