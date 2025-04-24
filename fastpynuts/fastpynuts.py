@@ -122,7 +122,7 @@ class NUTSfinder:
     @property
     def __geo_interface__(self):
         r"""The NUTSfinder represented as a `FeatureCollection` dict."""
-        gc = GeometryCollection([region_.geom for region_ in self.regions])
+        gc = self.to_geometry_collection()
         return gc.__geo_interface__
 
 
@@ -158,6 +158,12 @@ class NUTSfinder:
             else:
                 instance = cls(download_NUTS(datadir, scale=scale, year=year, epsg=epsg, level=level), **kwargs)
             return instance
+
+
+    def to_geometry_collection(self):
+        """Construct a shapely `GeometryCollection` from the finder's regions."""
+        gc = GeometryCollection([region_.geom for region_ in self.regions])
+        return gc
 
 
     def to_geojson(self, geojsonfile):
