@@ -308,7 +308,7 @@ class NUTSfinder:
 
     def _validate_geometry(self, geom, hits):
         """
-        The bounding boxes of a queried polygon might overlap with more regions, than the polygon does.
+        The bounding boxes of a queried polygon might overlap with more regions than the polygon does.
         Therefore, all candidate regions are checked via a polygon intersection test, by testing all regions of the highest level.
         """
 
