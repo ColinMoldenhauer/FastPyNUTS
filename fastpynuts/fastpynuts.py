@@ -89,7 +89,7 @@ class NUTSfinder:
     a buffer may lead to the assignment of multiple regions for points on the boundary.
 
     """
-    def __init__(self, geojsonfile, buffer_geoms=0, min_level=0, max_level=3):
+    def __init__(self, geojsonfile, buffer_geoms=None, min_level=0, max_level=3):
         assert min_level <= max_level, "`min_level` <= `max_level'"
         self.min_level = min_level
         self.max_level = max_level
@@ -110,12 +110,13 @@ class NUTSfinder:
     def __str__(self): return f"NUTSfinder (scale: {self.scale}, year: {self.year}, EPSG: {self.epsg}, levels: {self.min_level}-{self.max_level})"
 
     def __repr__(self):
+        buffer_str = f"{self.buffer:e}" if self.buffer is not None else f"{self.buffer}"
         return f"NUTSfinder (scale: {self.scale}, year: {self.year}, EPSG: {self.epsg})\n" \
                 f"   ├─ regions: [{self[0]}, ..., {self[-1]}] ({len(self):d})\n" \
                 f"   ├─ min_level:  {self.min_level:d}\n" \
                 f"   ├─ max_level:  {self.max_level:d}\n" \
-                f"   ├─ buffer:     {self.buffer:e}\n" \
                 f"   {self.file}"
+                f"   ├─ buffer:     {buffer_str}\n" \
 
 
     @classmethod
