@@ -112,11 +112,11 @@ class NUTSfinder:
     def __repr__(self):
         buffer_str = f"{self.buffer:e}" if self.buffer is not None else f"{self.buffer}"
         return f"NUTSfinder (scale: {self.scale}, year: {self.year}, EPSG: {self.epsg})\n" \
-                f"   ├─ regions: [{self[0]}, ..., {self[-1]}] ({len(self):d})\n" \
+                f"   ├─ regions: [{self[0]}, ..., {self[-1]}] (length {len(self):d})\n" \
                 f"   ├─ min_level:  {self.min_level:d}\n" \
                 f"   ├─ max_level:  {self.max_level:d}\n" \
-                f"   {self.file}"
                 f"   ├─ buffer:     {buffer_str}\n" \
+                f"   └ file:        {self.file}"
 
 
     @classmethod
