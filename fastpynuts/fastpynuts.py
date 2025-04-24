@@ -8,7 +8,7 @@ import re
 
 import numpy as np
 
-from shapely import Polygon, intersects, intersects_xy, is_geometry
+from shapely import Polygon, GeometryCollection, intersects, intersects_xy, is_geometry
 from rtree import index
 from treelib import Tree
 
@@ -118,6 +118,12 @@ class NUTSfinder:
                 f"   ├─ buffer:     {buffer_str}\n" \
                 f"   └ file:        {self.file}"
 
+    @property
+    def __geo_interface__(self):
+        r"""The NUTSfinder represented as a `FeatureCollection` dict."""
+        gc = GeometryCollection([region_.geom for region_ in self.regions])
+        return gc.__geo_interface__
+
 
     @classmethod
     def from_web(cls, scale=1, year=2021, epsg=4326, datadir=".data", **kwargs):
@@ -130,9 +136,19 @@ class NUTSfinder:
         file = os.path.join(datadir, f"NUTS_RG_{scale:02d}M_{year}_{epsg}.geojson")
 
         if os.path.exists(file):
-            return cls(file)
+            return cls(file, **kwargs)
         else:
             return cls(download_NUTS(datadir, scale=scale, year=year, epsg=epsg), **kwargs)
+
+
+    def to_geojson(self, geojsonfile):
+        """
+        Write the NUTSfinder's regions to file as a FeatureCollection.
+        Useful if the input dataset has been altered, i.e. by buffering, filtering, etc.
+        """
+        fc = self.__geo_interface__
+        with open(geojsonfile, "w") as f:
+            json.dump(fc, f)
 
 
     def find(self, lon, lat, valid_point=False, **kwargs) -> list:
